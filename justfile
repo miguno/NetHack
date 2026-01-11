@@ -47,18 +47,29 @@ install-dependencies:
     echo "Installing base dependencies on {{linux_distro}} (see sys/unix/NewInstall.unx and sys/unix/README-hints)"
     # Base dependencies, which supports tty mode (terminal/ASCII)
     sudo dnf install gcc gdb flex bison
+
     # ncurses (curses) mode
     sudo dnf install ncurses-devel
+
     # X11 mode
     sudo dnf install libX11-devel motif-devel libXaw-devel
-    # Qt5 mode
+
+    # Qt6 mode (do not use Qt5 if you use this)
+    sudo dnf install qt6-qtbase-devel qt6-qtmultimedia-devel
+
+    # Qt5 mode (do not use Qt6 if you use this)
     sudo dnf install qt5-qtbase-devel qt5-qtmultimedia-devel
     # HACK: Workaround because, on Fedora 43, the `moc` binary from
     # qt5-qtbase-devel is stored at `/usr/bin/moc-qt5`, which the build cannot
     # find because it is looking for `/usr/bin/moc`.
-    if [ ! -e "/usr/bin/moc" ]; then
-        sudo ln -s /usr/bin/moc-qt5 /usr/bin/moc
-    fi
+    # Alternatively, we could modify the respective "hints" file to set
+    # MOC (or MOCPATH?) appropriately, as described at
+    # https://nethackwiki.com/wiki/Qt#Linux
+    #if [ ! -e "/usr/bin/moc" ]; then
+    #    if [ -f "/usr/bin/moc-qt5" ]; then
+    #        sudo ln -s /usr/bin/moc-qt5 /usr/bin/moc
+    #    fi
+    #fi
 
 # alias for 'build-linux'
 [group('development')]
@@ -71,7 +82,7 @@ build-linux:
     set -euo pipefail
     echo "== Building NetHack (Linux) for the local user =="
     (cd sys/unix && ./setup.sh hints/linux.370.miguno) || exit 1
-    make fetch-lua && make WANT_WIN_ALL=1 all || exit 1
+    make fetch-lua && make WANT_WIN_ALL=1 WANT_WIN_QT6=1 all || exit 1
     echo "== Build of NetHack (Linux) completed =="
 
 # alias for 'install-linux'
@@ -88,7 +99,7 @@ install-linux-app: build-linux
     #!/usr/bin/env bash
     set -euo pipefail
     echo "== Installing NetHack (Linux) for the local user =="
-    make WANT_WIN_ALL=1 install || exit 1
+    make WANT_WIN_ALL=1 WANT_WIN_QT6=1 install || exit 1
     echo
     echo "== Installation of NetHack (Linux) completed =="
 
