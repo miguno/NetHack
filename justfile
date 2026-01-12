@@ -1,5 +1,5 @@
 project_dir := justfile_directory()
-linux_distro := shell("source /etc/os-release && echo $ID")
+linux_distro := shell("test -f /etc/os-release && source /etc/os-release && echo $ID || echo 'unknown'")
 nethack_binary := project_dir + "/src/nethack"
 
 # print available just recipes
@@ -85,6 +85,17 @@ build-linux:
     make fetch-lua && make WANT_WIN_ALL=1 WANT_WIN_QT6=1 all || exit 1
     echo "== Build of NetHack (Linux) completed =="
 
+# build macOS app
+[group('development')]
+build-macos:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "== Building NetHack (macOS) for the local user =="
+    (cd sys/unix && ./setup.sh hints/macOS.370.miguno) || exit 1
+    #make fetch-lua && make WANT_WIN_ALL=1 WANT_WIN_QT6=1 all || exit 1
+    make fetch-lua && make WANT_WIN_TTY=1 WANT_WIN_CURSES=1 all || exit 1
+    echo "== Build of NetHack (macOS) completed =="
+
 # alias for 'install-linux'
 [group('development')]
 install: install-linux
@@ -103,6 +114,16 @@ install-linux-app: build-linux
     echo
     echo "== Installation of NetHack (Linux) completed =="
 
+# install the macOS app
+[group('development')]
+install-macos: build-macos
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "== Installing NetHack (macOS) for the local user =="
+    make WANT_WIN_TTY=1 WANT_WIN_CURSES=1 install || exit 1
+    echo
+    echo "== Installation of NetHack (macOS) completed =="
+
 # build and install the Linux manpages system-wide (requires sudo)
 [group('development')]
 install-linux-manpages:
@@ -117,3 +138,9 @@ run: run-linux
 run-linux:
     #!/usr/bin/env bash
     $HOME/nethack/nethack
+
+# run the macOS app
+[group('app')]
+run-macos:
+    #!/usr/bin/env bash
+    $HOME/nethackdir/nethack
