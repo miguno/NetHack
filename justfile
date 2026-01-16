@@ -137,7 +137,7 @@ run: run-linux
 [group('app')]
 run-linux:
     #!/usr/bin/env bash
-    $HOME/nethack/nethack
+    $HOME/games/nethack
 
 # run the macOS app
 [group('app')]

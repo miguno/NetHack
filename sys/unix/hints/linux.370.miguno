@@ -379,10 +379,9 @@ CFLAGS+=-DSYSCF -DSYSCF_FILE=\"$(HACKDIR)/sysconf\" -DSECURE
 MOREALL=$(MAKE) install
 else #!WANT_SOURCE_INSTALL
 #PREFIX=/usr
-#PREFIX=$(wildcard ~)/nh/install
 PREFIX=$(wildcard ~)
-HACKDIR=$(PREFIX)/nethack/lib/nethackdir
-SHELLDIR = $(PREFIX)/nethack
+HACKDIR=$(PREFIX)/games/lib/nethackdir
+SHELLDIR = $(PREFIX)/games
 VARDIRPERM = 0755
 VARFILEPERM = 0600
 GAMEPERM = 0755
