@@ -130,7 +130,7 @@ install-linux-manpages:
     sudo make manpages
 
 # alias for 'run-linux'
-[group('development')]
+[group('app')]
 run: run-linux
 
 # run the Linux app
