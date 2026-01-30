@@ -31,6 +31,8 @@ struct e;
 staticfn int nhl_dump_fmtstr(lua_State *);
 #endif /* DUMPLOG */
 staticfn int nhl_dnum_name(lua_State *);
+staticfn int nhl_int_to_pm_name(lua_State *);
+staticfn int nhl_int_to_obj_name(lua_State *);
 staticfn int nhl_stairways(lua_State *);
 staticfn int nhl_pushkey(lua_State *);
 staticfn int nhl_doturn(lua_State *);
@@ -1164,6 +1166,51 @@ nhl_dnum_name(lua_State *L)
     return 1;
 }
 
+/* return gender-neutral monster type name by integer value,
+   or empty string if outside LOW_PM - HIGH_PM range */
+/* local montypename = int_to_pmname(12); */
+staticfn int
+nhl_int_to_pm_name(lua_State *L)
+{
+    int argc = lua_gettop(L);
+
+    if (argc == 1) {
+        lua_Integer i = luaL_checkinteger(L, 1);
+
+        if (i >= LOW_PM && i <= HIGH_PM)
+            lua_pushstring(L, mons[i].pmnames[NEUTRAL]);
+        else
+            lua_pushstring(L, "");
+    } else
+        nhl_error(L, "Expected an integer parameter");
+    return 1;
+}
+
+/* convert integer to object type name and class */
+/* local oname,oclass = int_to_objname(25); */
+staticfn int
+nhl_int_to_obj_name(lua_State *L)
+{
+    int argc = lua_gettop(L);
+
+    if (argc == 1) {
+        char buf[8];
+        lua_Integer i = luaL_checkinteger(L, 1);
+
+        if (i >= 0 && i < NUM_OBJECTS && OBJ_NAME(objects[i])) {
+            lua_pushstring(L, OBJ_NAME(objects[i]));
+            buf[0] = def_oc_syms[(int)objects[i].oc_class].sym;
+            buf[1] = '\0';
+            lua_pushstring(L, buf);
+        } else {
+            lua_pushstring(L, "");
+            lua_pushstring(L, "");
+        }
+    } else
+        nhl_error(L, "Expected an integer parameter");
+    return 2;
+}
+
 DISABLE_WARNING_UNREACHABLE_CODE
 /* because nhl_error() does not return */
 
@@ -1445,6 +1492,12 @@ nhl_debug_flags(lua_State *L)
     val = get_table_boolean_opt(L, "overwrite_stairs", -1);
     if (val != -1) {
         iflags.debug_overwrite_stairs = (boolean) val;
+    }
+
+    /* prevent pline going out to the UI */
+    val = get_table_boolean_opt(L, "prevent_pline", -1);
+    if (val != -1) {
+        iflags.debug_prevent_pline = (boolean) val;
     }
 
     return 0;
@@ -1836,6 +1889,8 @@ static const struct luaL_Reg nhl_functions[] = {
     { "dump_fmtstr", nhl_dump_fmtstr },
 #endif /* DUMPLOG */
     { "dnum_name", nhl_dnum_name },
+    { "int_to_pmname", nhl_int_to_pm_name },
+    { "int_to_objname", nhl_int_to_obj_name },
     { "variable", nhl_variable },
     { "stairways", nhl_stairways },
     { "pushkey", nhl_pushkey },
@@ -1851,6 +1906,11 @@ static const struct {
 } nhl_consts[] = {
     { "COLNO",  COLNO },
     { "ROWNO",  ROWNO },
+    { "NUMMONS", NUMMONS },
+    { "LOW_PM", LOW_PM },
+    { "HIGH_PM", HIGH_PM },
+    { "FIRST_OBJECT", FIRST_OBJECT },
+    { "LAST_OBJECT", NUM_OBJECTS-1 },
 #ifdef DLB
     { "DLB", 1 },
 #else
