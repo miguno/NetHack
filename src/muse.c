@@ -1,4 +1,4 @@
-/* NetHack 3.7	muse.c	$NHDT-Date: 1737392015 2025/01/20 08:53:35 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.234 $ */
+/* NetHack 3.7	muse.c	$NHDT-Date: 1770949988 2026/02/12 18:33:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.241 $ */
 /*      Copyright (C) 1990 by Ken Arromdee                         */
 /* NetHack may be freely redistributed.  See license for details.  */
 
@@ -1348,14 +1348,14 @@ hero_behind_chokepoint(struct monst *mtmp)
     coordxy x = mtmp->mux + dx;
     coordxy y = mtmp->muy + dy;
 
-    int dir = xytod(dx, dy);
+    int dir = xytodir(dx, dy);
     int dir_l = DIR_CLAMP(DIR_LEFT2(dir));
     int dir_r = DIR_CLAMP(DIR_RIGHT2(dir));
 
     coord c1, c2;
 
-    dtoxy(&c1, dir_l);
-    dtoxy(&c2, dir_r);
+    dirtocoord(&c1, dir_l);
+    dirtocoord(&c2, dir_r);
     c1.x += x, c2.x += x;
     c1.y += y, c2.y += y;
 
@@ -2426,7 +2426,7 @@ use_misc(struct monst *mtmp)
             mquaffmsg(mtmp, otmp);
         /* format monster's name before altering its visibility */
         Strcpy(nambuf, mon_nam(mtmp));
-        mon_set_minvis(mtmp);
+        mon_set_minvis(mtmp, !otmp->cursed ? FALSE : TRUE);
         if (vismon && mtmp->minvis) { /* was seen, now invisible */
             if (canspotmon(mtmp)) {
                 pline("%s body takes on a %s transparency.",
@@ -2439,6 +2439,17 @@ use_misc(struct monst *mtmp)
             }
             if (oseen)
                 makeknown(otmp->otyp);
+        } else if (vismon && !mtmp->minvis) {
+            /* cursed potion; mon tried to make itself invisible but failed */
+            pline("%s briefly seems to be transparent.", Monnam(mtmp));
+            /* we could call map_invisible() before the pline(), then
+               newsym() after; unseen monster glyph would be visible during
+               the pline, but hero would forget any remembered object under
+               the monster */
+        } else if (!vismon && canseemon(mtmp)) {
+            /* cursed potion; this won't happen because a monster will only
+               drink a potion of invisibility when not already invisible */
+            pline("%s suddenly appears!", Monnam(mtmp));
         }
         if (otmp->otyp == POT_INVISIBILITY) {
             if (otmp->cursed)
@@ -2520,7 +2531,7 @@ use_misc(struct monst *mtmp)
             int where_to = rn2(4);
             struct obj *obj = uwep;
             const char *hand;
-            char the_weapon[BUFSZ];
+            char the_weapon[BUFSZ], hand_buf[BUFSZ];
 
             if (!obj || !canletgo(obj, "")
                 || (u.twoweap && canletgo(uswapwep, "") && rn2(2)))
@@ -2532,10 +2543,12 @@ use_misc(struct monst *mtmp)
             hand = body_part(HAND);
             if (bimanual(obj))
                 hand = makeplural(hand);
+            (void) strncpy(hand_buf, hand, sizeof hand_buf - 1);
+            hand_buf[sizeof hand_buf - 1] = '\0';
 
             if (vismon)
                 pline_mon(mtmp, "%s flicks a bullwhip towards your %s!",
-                          Monnam(mtmp), hand);
+                          Monnam(mtmp), hand_buf);
             if (obj->otyp == HEAVY_IRON_BALL) {
                 pline("%s fails to wrap around %s.", The_whip, the_weapon);
                 return 1;
@@ -2544,7 +2557,7 @@ use_misc(struct monst *mtmp)
                          the_weapon);
             if (welded(obj)) {
                 pline("%s welded to your %s%c",
-                      !is_plural(obj) ? "It is" : "They are", hand,
+                      !is_plural(obj) ? "It is" : "They are", hand_buf,
                       !obj->bknown ? '!' : '.');
                 /* obj->bknown = 1; */ /* welded() takes care of this */
                 where_to = 0;
@@ -2563,7 +2576,7 @@ use_misc(struct monst *mtmp)
             switch (where_to) {
             case 1: /* onto floor beneath mon */
                 pline_mon(mtmp, "%s yanks %s from your %s!", Monnam(mtmp),
-                          the_weapon, hand);
+                          the_weapon, hand_buf);
                 place_object(obj, mtmp->mx, mtmp->my);
                 break;
             case 2: /* onto floor beneath you */

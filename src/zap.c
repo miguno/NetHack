@@ -1,4 +1,4 @@
-/* NetHack 3.7	zap.c	$NHDT-Date: 1741793439 2025/03/12 07:30:39 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.564 $ */
+/* NetHack 3.7	zap.c	$NHDT-Date: 1770949988 2026/02/12 18:33:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.584 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2013. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -26,6 +26,7 @@ staticfn void skiprange(int, int *, int *) NONNULLPTRS;
 staticfn void maybe_explode_trap(struct trap *, struct obj *,
                                boolean *) NONNULLARG3;
 staticfn void zap_map(coordxy, coordxy, struct obj *) NONNULLARG3;
+staticfn void bounce_dir(coordxy, coordxy, int *, int *, int) NO_NNARGS;
 staticfn int zap_hit(int, int);
 staticfn void disintegrate_mon(struct monst *, int, const char *) NONNULLARG1;
 staticfn int adtyp_to_prop(int);
@@ -352,7 +353,7 @@ bhitm(struct monst *mtmp, struct obj *otmp)
             seemimic(mtmp);
         /* format monster's name before altering its visibility */
         Strcpy(nambuf, Monnam(mtmp));
-        mon_set_minvis(mtmp);
+        mon_set_minvis(mtmp, FALSE);
         if (!oldinvis && knowninvisible(mtmp)) {
             pline("%s turns transparent!", nambuf);
             reveal_invis = TRUE;
@@ -3813,7 +3814,7 @@ zap_map(
  */
 struct monst *
 bhit(
-    coordxy ddx, coordxy ddy, int range,  /* direction and range */
+    int ddx, int ddy, int range,  /* direction and range */
     enum bhit_call_types weapon,  /* defined in hack.h */
     int (*fhitm)(MONST_P, OBJ_P), /* fns called when mon/obj hit */
     int (*fhito)(OBJ_P, OBJ_P),
@@ -4133,12 +4134,13 @@ bhit(
  * is too obviously silly.
  */
 struct monst *
-boomhit(struct obj *obj, coordxy dx, coordxy dy)
+boomhit(struct obj *obj, int dx, int dy)
 {
     int i, ct;
     int boom; /* showsym[] index  */
     struct monst *mtmp;
     boolean counterclockwise = URIGHTY; /* ULEFTY => clockwise */
+    int nhits = max(1, obj->spe + 1);
 
     /* counterclockwise traversal patterns, from @ to 1 then on through to 9
      *  ..........................54.................................
@@ -4156,7 +4158,7 @@ boomhit(struct obj *obj, coordxy dx, coordxy dy)
     gb.bhitpos.x = u.ux;
     gb.bhitpos.y = u.uy;
     boom = counterclockwise ? S_boomleft : S_boomright;
-    i = xytod(dx, dy);
+    i = xytodir(dx, dy);
     tmp_at(DISP_FLASH, cmap_to_glyph(boom));
     for (ct = 0; ct < 10; ct++) {
         i = DIR_CLAMP(i);
@@ -4173,8 +4175,12 @@ boomhit(struct obj *obj, coordxy dx, coordxy dy)
         }
         if ((mtmp = m_at(gb.bhitpos.x, gb.bhitpos.y)) != 0) {
             m_respond(mtmp);
-            tmp_at(DISP_END, 0);
-            return mtmp;
+            if (nhits-- < 0) {
+                tmp_at(DISP_END, 0);
+                return mtmp;
+            } else if (throwit_mon_hit(obj, mtmp) || !gt.thrownobj) {
+                break;
+            }
         }
         if (!ZAP_POS(levl[gb.bhitpos.x][gb.bhitpos.y].typ)
             || closed_door(gb.bhitpos.x, gb.bhitpos.y)) {
@@ -4636,6 +4642,51 @@ burn_floor_objects(
     return cnt;
 }
 
+/* which direction a ray bounces.
+   current location is sx,sy, direction is ddx, ddy.
+   bounceback is 1/n chance of bouncing back.
+   caller must ensure sx,sy is a bouncing location: !ZAP_POS or closed_door
+ */
+staticfn void
+bounce_dir(coordxy sx, coordxy sy,
+           int *ddx, int *ddy,
+           int bounceback)
+{
+    if (!*ddx || !*ddy || (bounceback > 0 && !rn2(bounceback))) {
+        *ddx = -(*ddx);
+        *ddy = -(*ddy);
+    } else {
+        uchar rmn;
+        int bounce = 0;
+        coordxy lsy = sy - *ddy;
+        coordxy lsx = sx - *ddx;
+
+        if (isok(sx, lsy) && ZAP_POS(rmn = levl[sx][lsy].typ)
+            && !closed_door(sx, lsy)
+            && (IS_ROOM(rmn) || (isok(sx + *ddx, lsy)
+                                 && ZAP_POS(levl[sx + *ddx][lsy].typ))))
+            bounce = 1;
+        if (isok(lsx, sy) && ZAP_POS(rmn = levl[lsx][sy].typ)
+            && !closed_door(lsx, sy)
+            && (IS_ROOM(rmn) || (isok(lsx, sy + *ddy)
+                                 && ZAP_POS(levl[lsx][sy + *ddy].typ))))
+            if (!bounce || rn2(2))
+                bounce = 2;
+        switch (bounce) {
+        case 0:
+            *ddx = -(*ddx);
+            FALLTHROUGH;
+            /*FALLTHRU*/
+        case 1:
+            *ddy = -(*ddy);
+            break;
+        case 2:
+            *ddx = -(*ddx);
+            break;
+        }
+    }
+}
+
 /* will zap/spell/breath attack score a hit against armor class `ac'? */
 staticfn int
 zap_hit(
@@ -4896,7 +4947,7 @@ dobuzz(
                 goto buzzmonst;
             } else if (zap_hit((int) u.uac, 0)) {
                 range -= 2;
-                pline_dir(xytod(-dx, -dy), "%s hits you!",
+                pline_dir(xytodir(-dx, -dy), "%s hits you!",
                           The(flash_str(fltyp, FALSE)));
                 if (Reflecting) {
                     if (!Blind) {
@@ -4932,14 +4983,12 @@ dobuzz(
 
         if (!ZAP_POS(levl[sx][sy].typ)
             || (closed_door(sx, sy) && range >= 0)) {
-            int bounce, bchance;
-            uchar rmn;
+            int bchance;
 
  make_bounce:
             bchance = (!isok(sx, sy) || levl[sx][sy].typ == STONE) ? 10
                       : (In_mines(&u.uz) && IS_WALL(levl[sx][sy].typ)) ? 20
                         : 75;
-            bounce = 0;
             if ((--range > 0 && isok(lsx, lsy) && cansee(lsx, lsy))
                 || fireball) {
                 if (Is_airlevel(&u.uz)) { /* nothing to bounce off of */
@@ -4955,36 +5004,8 @@ dobuzz(
                 } else
                     pline_The("%s bounces!", flash_str(fltyp, FALSE));
             }
-            if (!dx || !dy || !rn2(bchance)) {
-                dx = -dx;
-                dy = -dy;
-            } else {
-                if (isok(sx, lsy) && ZAP_POS(rmn = levl[sx][lsy].typ)
-                    && !closed_door(sx, lsy)
-                    && (IS_ROOM(rmn) || (isok(sx + dx, lsy)
-                                         && ZAP_POS(levl[sx + dx][lsy].typ))))
-                    bounce = 1;
-                if (isok(lsx, sy) && ZAP_POS(rmn = levl[lsx][sy].typ)
-                    && !closed_door(lsx, sy)
-                    && (IS_ROOM(rmn) || (isok(lsx, sy + dy)
-                                         && ZAP_POS(levl[lsx][sy + dy].typ))))
-                    if (!bounce || rn2(2))
-                        bounce = 2;
-
-                switch (bounce) {
-                case 0:
-                    dx = -dx;
-                    FALLTHROUGH;
-                    /*FALLTHRU*/
-                case 1:
-                    dy = -dy;
-                    break;
-                case 2:
-                    dx = -dx;
-                    break;
-                }
-                tmp_at(DISP_CHANGE, zapdir_to_glyph(dx, dy, hdmgtype));
-            }
+            bounce_dir(sx, sy, &dx, &dy, bchance);
+            tmp_at(DISP_CHANGE, zapdir_to_glyph(dx, dy, hdmgtype));
         }
     }
     tmp_at(DISP_END, 0);
