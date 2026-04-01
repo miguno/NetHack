@@ -1174,7 +1174,7 @@ create_savefile(void)
         if (nhfp->fd >= 0)
             (void) setmode(nhfp->fd, O_BINARY);
 #endif
-	}
+        }
     }
 #if defined(VMS) && !defined(SECURE)
     /*
@@ -1218,7 +1218,7 @@ open_savefile(void)
 #ifdef SAVEFILE_DEBUGGING
             nhfp->fplog = fopen("open-savefile.log", "w");
 #endif
-	}
+        }
 #ifdef MAC
         nhfp->fd = macopen(fq_save, O_RDONLY | O_BINARY, SAVE_TYPE);
 #else
@@ -2546,8 +2546,10 @@ proc_wizkit_line(char *buf)
     otmp = readobjnam(buf, (struct obj *) 0);
 
     if (otmp) {
-        if (otmp != &hands_obj)
+        if (otmp != &hands_obj) {
+            wish_history_add(buf);
             wizkit_addinv(otmp);
+        }
     } else {
         /* .60 limits output line width to 79 chars */
         config_error_add("Bad wizkit item: \"%.60s\"", buf);
@@ -3139,11 +3141,6 @@ debugcore(const char *filename, boolean wildcards)
 #endif /*DEBUG*/
 
 #ifndef SFCTOOL
-#ifdef UNIX
-#ifndef PATH_MAX
-#include <limits.h>
-#endif
-#endif
 
 #define SYSCONFFILE "system configuration file"
 

@@ -105,7 +105,6 @@ extern void stop_occupation(void);
 extern void init_sound_disp_gamewindows(void);
 extern void newgame(void);
 extern void welcome(boolean);
-extern int argcheck(int, char **, enum earlyarg);
 extern long timet_to_seconds(time_t);
 extern long timet_delta(time_t, time_t);
 
@@ -370,6 +369,8 @@ extern void change_palette(void);
 
 /* ### cmd.c ### */
 
+extern void cmdbind_freeall(void);
+extern int dotoggleoption(void);
 extern void set_move_cmd(int, int);
 extern int do_move_west(void);
 extern int do_move_northwest(void);
@@ -447,7 +448,7 @@ extern int doextlist(void);
 extern int extcmd_via_menu(void);
 extern int enter_explore_mode(void);
 extern boolean bind_mousebtn(int, const char *);
-extern boolean bind_key(uchar, const char *);
+extern boolean bind_key(uchar, const char *, boolean);
 extern void dokeylist(void);
 extern int xytodir(int, int);
 extern void dirtocoord(coord *, int);
@@ -917,6 +918,10 @@ extern void recbranch_mapseen(d_level *, d_level *) NONNULLPTRS;
 extern void overview_stats(winid, const char *, long *, long *) NONNULLPTRS;
 extern void remdun_mapseen(int);
 extern const char *endgamelevelname(char *, int);
+
+/* ### earlyarg.c ### */
+
+extern int argcheck(int, char **, enum earlyarg);
 
 /* ### eat.c ### */
 
@@ -1545,7 +1550,7 @@ extern int monster_census(boolean);
 extern int msummon(struct monst *);
 extern void summon_minion(aligntyp, boolean);
 extern int demon_talk(struct monst *) NONNULLARG1;
-extern long bribe(struct monst *) NONNULLARG1;
+extern long bribe(struct monst *, const char *) NONNULLARG12;
 extern int dprince(aligntyp);
 extern int dlord(aligntyp);
 extern int llord(void);
@@ -2284,6 +2289,7 @@ extern char *get_option_value(const char *, boolean) NONNULLARG1;
 extern int doset_simple(void);
 extern int doset(void);
 extern int dotogglepickup(void);
+extern int toggle_bool_option(const char *);
 extern void option_help(void);
 extern void all_options_strbuf(strbuf_t *) NONNULLARG1;
 extern void next_opt(winid, const char *) NONNULLARG2;
@@ -2860,6 +2866,8 @@ extern void bclose(int);
 /* setpaid() has a conditional code block near the end of the
    function, where arg1 is tested for NULL, preventing NONNULLARG1 */
 extern void setpaid(struct monst *) NO_NNARGS;
+extern void record_price_quote(int, unsigned long, boolean);
+extern void append_price_quote(char *, char **, int) NONNULLARG12;
 extern long money2mon(struct monst *, long) NONNULLARG1;
 extern void money2u(struct monst *, long) NONNULLARG1;
 extern void shkgone(struct monst *) NONNULLARG1;
@@ -3851,6 +3859,7 @@ extern void wizcustom_callback(winid win, int glyphnum, char *id);
 #if (NH_DEVEL_STATUS != NH_STATUS_RELEASED) || defined(DEBUG)
 extern int wiz_display_macros(void);
 extern int wiz_mon_diff(void);
+extern int wiz_objprobs(void);
 #endif
 extern void sanity_check(void);
 
@@ -3967,7 +3976,8 @@ extern int zhitm(struct monst *, int, int, struct obj **) NONNULLPTRS;
 extern int burn_floor_objects(coordxy, coordxy, boolean, boolean);
 extern void ubuzz(int, int);
 extern void buzz(int, int, coordxy, coordxy, int, int);
-extern void dobuzz(int, int, coordxy, coordxy, int, int, boolean, boolean);
+extern void dobuzz(int, int, coordxy, coordxy, int, int,
+                   boolean, boolean, boolean);
 extern void melt_ice(coordxy, coordxy, const char *) NO_NNARGS;
 extern void start_melt_ice_timeout(coordxy, coordxy, long);
 extern void melt_ice_away(union any *, long) NONNULLARG1;
@@ -3981,6 +3991,8 @@ extern boolean inventory_resistance_check(int);
 extern char *item_what(int);
 extern int destroy_items(struct monst *, int, int) NONNULLARG1;
 extern int resist(struct monst *, char, int, int) NONNULLARG1;
+extern void wish_history_add(char *);
+extern void wish_history_flush(void);
 extern void makewish(void);
 extern const char *flash_str(int, boolean) NONNULL;
 

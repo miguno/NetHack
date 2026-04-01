@@ -1288,9 +1288,14 @@ makemon(
     /* quest leader and nemesis both know about all trap types */
     if (ptr->msound == MS_LEADER || ptr->msound == MS_NEMESIS)
         mon_learns_traps(mtmp, ALL_TRAPS);
+    /* locations where monsters are already experienced with wands */
+    if (Is_stronghold(&u.uz) || Is_knox(&u.uz) || In_endgame(&u.uz) ||
+        In_hell(&u.uz) || In_V_tower(&u.uz) || In_quest(&u.uz))
+        mtmp->mwandexp = TRUE;
 
     place_monster(mtmp, x, y);
     mtmp->mcansee = mtmp->mcanmove = TRUE;
+    mtmp->mgenmklev = gi.in_mklev;
     mtmp->seen_resistance = M_SEEN_NOTHING;
     mtmp->mpeaceful = (mmflags & MM_ANGRY) ? FALSE : peace_minded(ptr);
     if ((mmflags & MM_MINVIS) != 0) /* for ^G */

@@ -1109,7 +1109,9 @@ freedynamicdata(void)
     freeroleoptvals(); /* saveoptvals(&tnhfp) */
     cmdq_clear(CQ_CANNED);
     cmdq_clear(CQ_REPEAT);
+    cmdbind_freeall();
     free_tutorial(); /* (only needed if quitting while in tutorial) */
+    wish_history_flush();
 
     /* per-turn data, but might get added to when freeing other stuff */
     dobjsfree(); /* really free deleted objects */

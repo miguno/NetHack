@@ -9,9 +9,6 @@
 #ifndef NO_SIGNAL
 #include <signal.h>
 #endif
-#ifndef LONG_MAX
-#include <limits.h>
-#endif
 #include "dlb.h"
 
 #ifndef SFCTOOL
@@ -479,7 +476,8 @@ staticfn boolean
 should_query_disclose_option(int category, char *defquery)
 {
     int idx;
-    char disclose, *dop;
+    char disclose;
+    const char *dop;
 
     *defquery = 'n';
     if ((dop = strchr(disclosure_options, category)) != 0) {
@@ -1765,7 +1763,7 @@ save_killers(NHFILE *nhfp)
 
     if (update_file(nhfp)) {
         for (kptr = &svk.killer; kptr; kptr = kptr->next) {
-	    Sfo_kinfo(nhfp, kptr, "kinfo");
+            Sfo_kinfo(nhfp, kptr, "kinfo");
         }
     }
     if (release_data(nhfp)) {

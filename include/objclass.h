@@ -91,7 +91,7 @@ struct objclass {
     uchar oc_color; /* color of the object */
 
     short oc_prob;            /* probability, used in mkobj() */
-    unsigned short oc_weight; /* encumbrance (1 cn = 0.1 lb.) */
+    unsigned oc_weight;       /* encumbrance (1 cn = 0.1 lb.) */
     short oc_cost;            /* base cost in shops */
     /* Check the AD&D rules!  The FIRST is small monster damage. */
     /* for weapons, and tools, rocks, and gems useful as weapons */
@@ -104,6 +104,11 @@ struct objclass {
 #define oc_level oc_oc2 /* books: spell level */
 
     unsigned short oc_nutrition; /* food value */
+
+    unsigned long oc_sell_minseen;
+    unsigned long oc_sell_maxseen;
+    unsigned long oc_buy_minseen;
+    unsigned long oc_buy_maxseen;
 };
 
 struct class_sym {
