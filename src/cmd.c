@@ -1673,7 +1673,7 @@ struct ext_func_tab extcmdlist[] = {
     { M('a'), "adjust", "adjust inventory letters",
               doorganize, IFBURIED | AUTOCOMPLETE | GENERALCMD, NULL },
     { M('A'), "annotate", "name current level",
-              donamelevel, IFBURIED | AUTOCOMPLETE | GENERALCMD, NULL },
+              donamelevel, IFBURIED | AUTOCOMPLETE | GENERALCMD | CMD_M_PREFIX, NULL },
     { 'a',    "apply", "apply (use) a tool (pick-axe, key, lamp...)",
               doapply, CMD_M_PREFIX, NULL },
     { C('x'), "attributes", "show your attributes",
@@ -2297,7 +2297,6 @@ handler_rebind_keys_add(boolean keyfirst)
     char buf2[QBUFSZ];
     uchar key = '\0';
     int clr = NO_COLOR;
-    struct Cmd_bind *bind;
 
     if (keyfirst) {
         pline("Bind which key? ");
@@ -2312,8 +2311,9 @@ handler_rebind_keys_add(boolean keyfirst)
     any = cg.zeroany;
 
     if (key) {
-        bind = cmdbind_get(key);
-        if (bind) {
+        struct Cmd_bind *bind = cmdbind_get(key);
+
+        if (bind && bind->cmd) {
             Sprintf(buf, "Key '%s' is currently bound to \"%s\".",
                     key2txt(key, buf2), bind->cmd->ef_txt);
         } else {
@@ -3704,7 +3704,8 @@ rhack(int key)
                  * the former call to help_dir() (for 'bad_command' below).
                  */
                 if (was_m_prefix) {
-                    pline("The %s command does not accept '%s' prefix.",
+                    custompline(SUPPRESS_HISTORY,
+                          "The %s command does not accept '%s' prefix.",
                           tlist->ef_txt, which);
                 } else {
                     uchar ch = tlist->key;
