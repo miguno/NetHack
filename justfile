@@ -81,7 +81,7 @@ build-linux:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "== Building NetHack (Linux) for the local user =="
-    (cd sys/unix && ./setup.sh hints/linux.370.miguno) || exit 1
+    (cd sys/unix && ./setup.sh hints/linux.500.miguno) || exit 1
     make fetch-lua && make WANT_WIN_ALL=1 WANT_WIN_QT6=1 all || exit 1
     echo "== Build of NetHack (Linux) completed =="
 
@@ -91,7 +91,7 @@ build-macos:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "== Building NetHack (macOS) for the local user =="
-    (cd sys/unix && ./setup.sh hints/macOS.370.miguno) || exit 1
+    (cd sys/unix && ./setup.sh hints/macOS.500.miguno) || exit 1
     #make fetch-lua && make WANT_WIN_ALL=1 WANT_WIN_QT6=1 all || exit 1
     make fetch-lua && make WANT_WIN_TTY=1 WANT_WIN_CURSES=1 all || exit 1
     echo "== Build of NetHack (macOS) completed =="
