@@ -110,10 +110,6 @@ static char fqn_filename_buffer[FQN_NUMBUF][FQN_MAX_FILENAME];
 
 #ifdef AMIGA
 extern char PATH[]; /* see sys/amiga/amidos.c */
-extern char bbs_id[];
-#ifdef __SASC_60
-#include <proto/dos.h>
-#endif
 
 #include <libraries/dos.h>
 extern void amii_set_text_font(char *, int);
@@ -1065,11 +1061,6 @@ set_savefile_name(boolean regularize_it)
 #if defined(MICRO) && !defined(WIN32) && !defined(MSDOS)
     if (strlen(gs.SAVEP) < (SAVESIZE - 1))
         Strcpy(gs.SAVEF, gs.SAVEP);
-    else
-#ifdef AMIGA
-        if (strlen(gs.SAVEP) + strlen(bbs_id) < (SAVESIZE - 1))
-            strncat(gs.SAVEF, bbs_id, PATHLEN);
-#endif
     {
         int i = strlen(gs.SAVEP);
 #ifdef AMIGA
@@ -2050,7 +2041,7 @@ problematic_savefile(int sfstatus, const char *savefilenm)
 
 /* ----------  BEGIN EXTERNAL CONVERSION HANDLING ----------- */
 
-static boolean cvtinit = FALSE;
+/* static boolean cvtinit = FALSE; */
 
 #ifndef SFCTOOL
 static char *unconverted_filename = 0, *converted_filename = 0;
@@ -2171,7 +2162,7 @@ free_convert_filenames(void)
         free((genericptr_t) converted_filename), converted_filename = 0;
     if (unconverted_filename)
         free((genericptr_t) unconverted_filename), unconverted_filename = 0;
-    cvtinit = FALSE;
+/*    cvtinit = FALSE; */
 }
 
 /* return TRUE if s contains a directory, not just a filespec */

@@ -22,15 +22,9 @@ staticfn void regen_pw(int);
 staticfn void regen_hp(int);
 staticfn void interrupt_multi(const char *);
 
-#ifdef CRASHREPORT
-#define USED_FOR_CRASHREPORT
-#else
-#define USED_FOR_CRASHREPORT UNUSED
-#endif
-
 /*ARGSUSED*/
 void
-early_init(int argc USED_FOR_CRASHREPORT, char *argv[] USED_FOR_CRASHREPORT)
+early_init(int argc, char *argv[])
 {
     program_state_init();
 #ifdef CRASHREPORT
@@ -42,6 +36,8 @@ early_init(int argc USED_FOR_CRASHREPORT, char *argv[] USED_FOR_CRASHREPORT)
     monst_globals_init();
     sys_early_init();
     runtime_info_init();
+    nhUse(argc);
+    nhUse(argv[0]);
 }
 
 staticfn void
@@ -580,6 +576,9 @@ maybe_do_tutorial(void)
         vision_recalc(0);
         docrt();
         iflags.nofollowers = FALSE;
+    } else {
+        /* no tutorial, so okay to process mention_decor now */
+        rcfile_only_this_option(opt_mention_decor);
     }
 }
 
@@ -590,6 +589,9 @@ moveloop(boolean resuming)
 
     if (!resuming)
         maybe_do_tutorial();
+
+    /* process one deferred option post-tutorial */
+    rcfile_only_this_option(opt_mention_decor);
 
     for (;;) {
         moveloop_core();
