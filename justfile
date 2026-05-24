@@ -1,5 +1,5 @@
 project_dir := justfile_directory()
-linux_distro := shell("test -f /etc/os-release && source /etc/os-release && echo $ID || echo 'unknown'")
+linux_distro := shell("test -f /etc/os-release && . /etc/os-release && echo $ID || echo 'unknown'")
 nethack_binary := project_dir + "/src/nethack"
 
 # print available just recipes
@@ -39,37 +39,59 @@ install-dependencies:
         exit 1
     fi
 
-    if [ ! "{{linux_distro}}" = "fedora" ]; then
-        echo "ERROR: The Linux distribution {{linux_distro}} is not supported yet."
-        exit 1
-    fi
-
     echo "Installing base dependencies on {{linux_distro}} (see sys/unix/NewInstall.unx and sys/unix/README-hints)"
-    # Base dependencies, which supports tty mode (terminal/ASCII)
-    sudo dnf install gcc gdb flex bison
+    case "{{linux_distro}}" in
+        fedora)
+            # Base dependencies, which supports tty mode (terminal/ASCII)
+            sudo dnf install gcc gdb flex bison
 
-    # ncurses (curses) mode
-    sudo dnf install ncurses-devel
+            # ncurses (curses) mode
+            sudo dnf install ncurses-devel
 
-    # X11 mode
-    sudo dnf install libX11-devel motif-devel libXaw-devel
+            # X11 mode
+            sudo dnf install libX11-devel motif-devel libXaw-devel
 
-    # Qt6 mode (do not use Qt5 if you use this)
-    sudo dnf install qt6-qtbase-devel qt6-qtmultimedia-devel
+            # Qt6 mode (do not use Qt5 if you use this)
+            sudo dnf install qt6-qtbase-devel qt6-qtmultimedia-devel
 
-    # Qt5 mode (do not use Qt6 if you use this)
-    sudo dnf install qt5-qtbase-devel qt5-qtmultimedia-devel
-    # HACK: Workaround because, on Fedora 43, the `moc` binary from
-    # qt5-qtbase-devel is stored at `/usr/bin/moc-qt5`, which the build cannot
-    # find because it is looking for `/usr/bin/moc`.
-    # Alternatively, we could modify the respective "hints" file to set
-    # MOC (or MOCPATH?) appropriately, as described at
-    # https://nethackwiki.com/wiki/Qt#Linux
-    #if [ ! -e "/usr/bin/moc" ]; then
-    #    if [ -f "/usr/bin/moc-qt5" ]; then
-    #        sudo ln -s /usr/bin/moc-qt5 /usr/bin/moc
-    #    fi
-    #fi
+            # Qt5 mode (do not use Qt6 if you use this)
+            #sudo dnf install qt5-qtbase-devel qt5-qtmultimedia-devel
+            # HACK: Workaround because, on Fedora 43, the `moc` binary from
+            # qt5-qtbase-devel is stored at `/usr/bin/moc-qt5`, which the build cannot
+            # find because it is looking for `/usr/bin/moc`.
+            # Alternatively, we could modify the respective "hints" file to set
+            # MOC (or MOCPATH?) appropriately, as described at
+            # https://nethackwiki.com/wiki/Qt#Linux
+            #if [ ! -e "/usr/bin/moc" ]; then
+            #    if [ -f "/usr/bin/moc-qt5" ]; then
+            #        sudo ln -s /usr/bin/moc-qt5 /usr/bin/moc
+            #    fi
+            #fi
+            ;;
+        debian|ubuntu)
+            sudo apt update
+            # Base dependencies, which supports tty mode (terminal/ASCII)
+            sudo apt install gcc gdb flex bison pkgconf
+
+            # ncurses (curses) mode (libncurses-dev provides both ncurses and the
+            # wide-character ncursesw libraries)
+            sudo apt install libncurses-dev
+
+            # X11 mode (xfonts-utils provides bdftopcf and mkfontdir, used by
+            # the X11 post-install step)
+            sudo apt install libx11-dev libmotif-dev libxaw7-dev libxpm-dev xfonts-utils
+
+            # Qt6 mode (do not use Qt5 if you use this)
+            sudo apt install qt6-base-dev qt6-multimedia-dev
+
+            # Qt5 mode (do not use Qt6 if you use this)
+            #sudo apt install qtbase5-dev qtmultimedia5-dev
+            ;;
+        *)
+            echo "ERROR: The Linux distribution {{linux_distro}} is not supported yet."
+            exit 1
+            ;;
+    esac
 
 # alias for 'build-linux'
 [group('development')]
@@ -91,7 +113,7 @@ build-macos:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "== Building NetHack (macOS) for the local user =="
-    (cd sys/unix && ./setup.sh hints/macOS.500.miguno) || exit 1
+    (cd sys/unix && ./setup.sh hints/macOS.500) || exit 1
     #make fetch-lua && make WANT_WIN_ALL=1 WANT_WIN_QT6=1 all || exit 1
     make fetch-lua && make WANT_WIN_TTY=1 WANT_WIN_CURSES=1 all || exit 1
     echo "== Build of NetHack (macOS) completed =="
