@@ -274,6 +274,7 @@ ifdef CROSS_TO_WASM
 # WASM
 # originally from https://github.com/NetHack/NetHack/pull/385
 #===============-=================================================
+#also set a make variable flagging this as a crosscompile
 #
 #WASM_DEBUG = 1
 WASM_DATA_DIR = $(TARGETPFX)wasm-data
