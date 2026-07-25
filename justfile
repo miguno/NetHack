@@ -104,7 +104,7 @@ build-linux:
     set -euo pipefail
     echo "== Building NetHack (Linux) for the local user =="
     (cd sys/unix && ./setup.sh hints/linux.500.miguno) || exit 1
-    make fetch-lua && make WANT_WIN_ALL=1 WANT_WIN_QT6=1 all || exit 1
+    make fetch-lua && make -j$(nproc) WANT_WIN_ALL=1 WANT_WIN_QT6=1 all || exit 1
     echo "== Build of NetHack (Linux) completed =="
 
 # build macOS app
