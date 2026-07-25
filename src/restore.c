@@ -1,4 +1,4 @@
-/* NetHack 5.0	restore.c	$NHDT-Date: 1736530208 2025/01/10 09:30:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.234 $ */
+/* NetHack 5.0	restore.c	$NHDT-Date: 1781973064 2026/06/20 16:31:04 $  $NHDT-Branch: NetHack-5.0 $:$NHDT-Revision: 1.265 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Michael Allison, 2009. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -448,6 +448,13 @@ restmonchn(NHFILE *nhfp)
             restshk(mtmp, ghostly);
         if (mtmp->ispriest)
             restpriest(mtmp, ghostly);
+        if (mtmp->isgd) {
+            /* fixup for new bit MON_PARKED added post 5.0.0 */
+            if (!mtmp->mx
+                && (mtmp->mstate & MON_PARKED) == 0L
+                && (mtmp->mstate & MON_MIGRATING) == 0L)
+                mtmp->mstate |= MON_PARKED;
+        }
 
         if (!ghostly) {
             if (mtmp->m_id == svc.context.polearm.m_id)
@@ -713,6 +720,14 @@ restgamestate(NHFILE *nhfp)
     restore_oracles(nhfp);
     Sfi_char(nhfp, svp.pl_character,
              "gamestate-pl_character", sizeof svp.pl_character);
+    /* Previous versions had a bug that clobbered pl_character on restore.
+       Fill it in if it was clobbered. */
+    if (svp.pl_character[0] == '\0') {
+        if ((Upolyd ? u.mfemale : flags.female) && gu.urole.name.f)
+            Strcpy(svp.pl_character, gu.urole.name.f);
+        else
+            Strcpy(svp.pl_character, gu.urole.name.m);
+    }
     Sfi_char(nhfp, svp.pl_fruit, "gamestate-pl_fruit", sizeof svp.pl_fruit);
     freefruitchn(gf.ffruit); /* clean up fruit(s) made by initoptions() */
     gf.ffruit = loadfruitchn(nhfp);
@@ -791,11 +806,13 @@ dorecover(NHFILE *nhfp)
 {
     xint8 ltmp = 0;
     int rtmp;
+    char plname[PL_NSIZ_PLUS];
 
     /* suppress map display if some part of the code tries to update that */
     program_state.restoring = REST_GSTATE;
 
-    get_plname_from_file(nhfp, svp.plname, TRUE);
+    get_plname_from_file(nhfp, plname, TRUE);
+    Snprintf(svp.plname, sizeof(svp.plname), "%s", plname);
     /*
      * The position in the save file is now here:
      *
@@ -891,7 +908,8 @@ dorecover(NHFILE *nhfp)
 
     rewind_nhfile(nhfp);        /* return to beginning of file */
     (void) validate(nhfp, (char *) 0, FALSE, 0);
-    get_plname_from_file(nhfp, svp.plname, TRUE);
+    get_plname_from_file(nhfp, plname, TRUE);
+    Snprintf(svp.plname, sizeof(svp.plname), "%s", plname);
 
     /* not 0 nor REST_GSTATE nor REST_LEVELS */
     program_state.restoring = REST_CURRENT_LEVEL;
@@ -1122,7 +1140,7 @@ getlev(NHFILE *nhfp, int pid, xint8 lev)
     Sfi_dest_area(nhfp, &svu.updest, "lev-updest");
     Sfi_dest_area(nhfp, &svd.dndest, "lev-dndest");
     Sfi_levelflags(nhfp, &svl.level.flags, "lev-level_flags");
-    rest_adjust_levelflags();
+    rest_adjust_levelflags(elapsed);
     if (svd.doors) {
         free(svd.doors);
         svd.doors = 0;
@@ -1191,14 +1209,17 @@ getlev(NHFILE *nhfp, int pid, xint8 lev)
     for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
         if (mtmp->isshk)
             set_residency(mtmp, FALSE);
+        /* set some monst fields to sane values when coming from a bones file */
+        if (ghostly) {
+            mtmp->movement = 0;
+        }
         if (mtmp->m_id == u.usteed_mid) {
             /* steed is kept on fmon list but off the map */
             u.usteed = mtmp;
             u.usteed_mid = 0;
         } else {
             if (mtmp->m_id == u.ustuck_mid) {
-                set_ustuck(mtmp);
-                u.ustuck_mid = 0;
+                set_ustuck(mtmp); /* set_ustuck clears u.ustuck_mid */
             }
             place_monster(mtmp, mtmp->mx, mtmp->my);
             if (mtmp->wormno)
@@ -1326,11 +1347,13 @@ getlev(NHFILE *nhfp, int pid, xint8 lev)
 }
 
 void
-rest_adjust_levelflags(void)
+rest_adjust_levelflags(long elapsed)
 {
     /* adjust timestamps */
     relative_time_to_moves(&svl.level.flags.stasis_until);
+    svl.level.flags.stasis_until -= elapsed;
 }
+
 void
 moves_to_relative_time(long *timestamp)
 {
