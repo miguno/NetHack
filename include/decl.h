@@ -180,6 +180,8 @@ struct instance_globals_a {
         a chain of objects, use alternate phrasing after the first message */
     struct h2o_ctx acid_ctx;
 
+    long articulo_mortis;
+
     boolean havestate;
 };
 
@@ -786,6 +788,9 @@ struct instance_globals_p {
     unsigned pline_flags;
     char prevmsg[BUFSZ];
 
+    /* mon.c */
+    enum mon_terrain_effects pending_terrain_effects;
+
     /* potion.c */
     int potion_nothing;
     int potion_unkn;
@@ -1055,7 +1060,7 @@ struct instance_globals_w {
     /* new */
     struct win_settings wsettings;      /* wintype.h */
     long were_changes;                  /* were.c, allmain.c */
-
+    long whitelist_shk;
     boolean havestate;
 };
 

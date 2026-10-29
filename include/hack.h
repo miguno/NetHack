@@ -725,6 +725,14 @@ struct plinemsg_type {
 /* bitmask for callers of hide_unhide_msgtypes() */
 #define MSGTYP_MASK_REP_SHOW ((1 << MSGTYP_NOREP) | (1 << MSGTYP_NOSHOW))
 
+enum mon_terrain_effects {
+    no_terrain_effects = 0x00000000,
+    /* these bit values must be beyond the MON_ ranges in monst.h
+       since they get set on mon->mstate */
+    nonflyer_vs_liquid  = 0x10000000,
+    candrown_vs_liquid = 0x20000000,
+};
+
 /* polyself flags */
 enum polyself_flags {
     POLY_NOFLAGS    = 0x00,
@@ -797,6 +805,7 @@ struct sinfo {
     int in_role_selection;      /* role/race/&c selection menus in progress */
     int in_getlin;              /* inside interface getlin routine */
     int in_sanity_check;        /* for impossible() during sanity checking */
+    int in_idlecheckpoint;      /* an input timeout has triggered idlecheckpoint */
     int config_error_ready;     /* config_error_add is ready, available */
     int beyond_savefile_load;   /* set when past savefile loading */
     int savefile_completed;     /* savefile has completed writing */
@@ -969,15 +978,11 @@ struct xlock_s {
 #define FREEING      0x04
 #define CONVERTING   0x08
 #define UNCONVERTING 0x10
-#if 0
-/* operations of the various saveXXXchn & co. routines */
-#define perform_bwrite(nhfp) ((nhfp)->mode & (COUNTING | WRITING))
-#define release_data(nhfp) ((nhfp)->mode & FREEING)
-#endif
 
 /* operations of the various saveXXXchn & co. routines */
 #define update_file(nhfp) ((nhfp)->mode & (COUNTING | WRITING))
 #define release_data(nhfp) ((nhfp)->mode & FREEING)
+#define freeing_only(nhfp) ((nhfp)->mode == FREEING)
 
 enum saveformats {
     invalid = 0,
@@ -1409,9 +1414,10 @@ typedef uint32_t mmflags_nht;     /* makemon MM_ flags */
 #define HEALTHY_TIN (-3)
 
 /* Corpse aging */
-#define TAINT_AGE (50L)        /* age when corpses go bad */
+#define INEDIBLE_AGE  (50L)    /* age when corpse becomes unsafe to eat */
+#define TAINT_AGE    (100L)    /* age when corpse becomes tainted */
+#define ROT_AGE      (250L)    /* age when corpse rots away */
 #define TROLL_REVIVE_CHANCE 37 /* 1/37 chance for 50 turns ~ 75% chance */
-#define ROT_AGE (250L)         /* age when corpses rot away */
 
 /* Some misc definitions */
 #define POTION_OCCUPANT_CHANCE(n) (13 + 2 * (n))
@@ -1564,8 +1570,10 @@ typedef uint32_t mmflags_nht;     /* makemon MM_ flags */
 #define DEVTEAM_EMAIL "devteam@nethack.org"
 #define DEVTEAM_URL "https://www.nethack.org/"
 
+#ifndef __cplusplus
 #if !defined(CROSSCOMPILE) || defined(CROSSCOMPILE_TARGET)
 #include "nhlua.h"
+#endif
 #endif
 
 #if !defined(RECOVER_C)

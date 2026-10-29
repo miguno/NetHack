@@ -2559,6 +2559,14 @@ optfn_name(
 
         if ((op = string_for_env_opt(allopt[optidx].name, opts, FALSE))
             != empty_optstr) {
+#ifdef WIN32
+            /*
+             * Under windows, if we already set flags.debug with -D
+             * on the command line, leave that alone.
+             */
+            if (flags.debug && !strcmpi(svp.plname, "wizard"))
+                return optn_ok;
+#endif
             nmcpy(svp.plname, op, PL_NSIZ);
         } else
             return optn_err;
@@ -5695,8 +5703,13 @@ handler_disclose(void)
     start_menu(tmpwin, MENU_BEHAVE_STANDARD);
     any = cg.zeroany;
     for (i = 0; i < NUM_DISCLOSURE_OPTIONS; i++) {
-        Sprintf(buf, "%-12s[%c%c]", disclosure_names[i],
-                flags.end_disclose[i], disclosure_options[i]);
+        if (iflags.menu_tab_sep) {
+            Sprintf(buf, "%s\t[%c%c]", disclosure_names[i],
+                    flags.end_disclose[i], disclosure_options[i]);
+        } else {
+            Sprintf(buf, "%-12s[%c%c]", disclosure_names[i],
+                    flags.end_disclose[i], disclosure_options[i]);
+        }
         any.a_int = i + 1;
         add_menu(tmpwin, &nul_glyphinfo, &any, disclosure_options[i],
                  0, ATR_NONE, clr, buf, MENU_ITEMFLAGS_NONE);
@@ -7153,8 +7166,14 @@ initoptions_init(void)
 
     /* make any symbol parsing quicker, but only if
      * gd.disable_glyphname_hash_indices_prefill is not set to TRUE */
+#ifndef MAC68K
+    /* Skip on classic Mac OS — the prefill iterates thousands of glyphs
+       (Sprintf + hash insertions), taking ~2 minutes on a 68030.  Lazy
+       lookup on first use is cheaper; the cache is only needed for glyph
+       name lookups in config files. */
     if (!glyphname_hash_indices_loaded() && !gd.disable_glyphname_hash_indices_prefill)
         populate_glyphname_hash_indices();
+#endif
 
     /* set up the command parsing */
     reset_commands(TRUE); /* init */

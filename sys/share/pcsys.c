@@ -155,11 +155,15 @@ getreturn(const char *str)
     msmsg("Hit <Enter> %s.", str);
 #endif
 #endif
-    while (pgetchar() != '\n')
-        ;
+#if defined(PC_EARLY_OPTIONS)
+    if (isatty(STDOUT_FILENO))
+#endif
+        while (pgetchar() != '\n')
+            ;
     return;
 }
 
+#ifndef CROSS_TO_ATARI /* sys/share/pcmain.c provides its own */
 void msmsg
 VA_DECL(const char *, fmt)
 {
@@ -174,6 +178,7 @@ VA_DECL(const char *, fmt)
     VA_END();
     return;
 }
+#endif
 
 /*
  * Follow the PATH, trying to fopen the file.

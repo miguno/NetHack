@@ -913,8 +913,8 @@ place_monster(struct monst *mon, coordxy x, coordxy y)
         x = y = 0;
     }
     if ((mon == u.usteed && !gi.in_steed_dismounting)
-        /* special case is for convoluted vault guard handling */
-        || (DEADMONSTER(mon) && !PARKEDMONSTER(mon))) {
+        /* dead vault guards stay at <0,0> until their fake corridor is cleared */
+        || (DEADMONSTER(mon) && !(mon->isgd && x == 0 && y == 0))) {
         describe_level(buf, 0);
         impossible("placing %s onto map, mstate:%lx, on %s?",
                    (mon == u.usteed) ? "steed" : "defunct monster",
@@ -935,11 +935,10 @@ place_monster(struct monst *mon, coordxy x, coordxy y)
        bits that may be set. We'll probably make MON_FLOOR an
        actual bit one day */
 
-    mon->mstate &= ~(MON_OFFMAP | MON_DETACH | MON_LIMBO | MON_MIGRATING);
+    mon->mstate &= ~(MON_OFF_MAP_BITS);
 
     /* We don't mess with these bits above:
-       MON_BUBBLEMOVE | MON_ENDGAME_FREE | MON_ENDGAME_MIGR
-       | MON_OBLITERATE | MON_STILL_ARRIVING | MON_PARKED
+       MON_OBLITERATE | MON_STILL_ARRIVING
      */
 }
 

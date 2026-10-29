@@ -617,7 +617,7 @@ probe_objchain(struct obj *otmp)
             otmp->lknown = 1;
             if (!SchroedingersBox(otmp))
                 otmp->cknown = 1;
-        } else if (otmp->otyp == TIN)
+        } else if (otmp->otyp == TIN || otmp->otyp == EGG)
             otmp->known = 1;
     }
 }
@@ -3586,7 +3586,7 @@ miss(const char *str, struct monst *mtmp)
 {
     pline("%s %s %s.", The(str), vtense(str, "miss"),
           ((cansee(gb.bhitpos.x, gb.bhitpos.y) || canspotmon(mtmp))
-           && flags.verbose) ? mon_nam(mtmp) : "it");
+           && flags.verbose) ? ((mtmp->mtame) ? noit_mon_nam(mtmp) : mon_nam(mtmp)) : "it");
 }
 
 staticfn void

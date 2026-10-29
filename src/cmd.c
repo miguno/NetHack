@@ -674,10 +674,15 @@ doextlist(void)
                     add_menu_heading(menuwin, buf);
                     menushown[pass] = 1;
                 }
-                /* longest ef_txt at present is "wizrumorcheck" (13 chars);
-                   2nd field will be "    " or " [A]" or " [m]" or "[mA]" */
-                Sprintf(buf, " %-14s %4s %s", efp->ef_txt,
-                        doc_extcmd_flagstr(menuwin, efp), cmd_desc);
+                if (iflags.menu_tab_sep) {
+                    Sprintf(buf, " %s\t%s\t%s", efp->ef_txt,
+                            doc_extcmd_flagstr(menuwin, efp), cmd_desc);
+                } else {
+                    /* longest ef_txt at present is "wizrumorcheck" (13 chars);
+                       2nd field will be "    " or " [A]" or " [m]" or "[mA]" */
+                    Sprintf(buf, " %-14s %4s %s", efp->ef_txt,
+                            doc_extcmd_flagstr(menuwin, efp), cmd_desc);
+                }
                 add_menu_str(menuwin, buf);
                 ++n;
             }
@@ -733,7 +738,8 @@ doextlist(void)
     return ECMD_OK;
 }
 
-#if defined(TTY_GRAPHICS) || defined(CURSES_GRAPHICS)
+#if defined(TTY_GRAPHICS) || defined(CURSES_GRAPHICS) \
+    || defined(AMIGA_INTUITION)
 #define MAX_EXT_CMD 200 /* Change if we ever have more ext cmds */
 
 DISABLE_WARNING_FORMAT_NONLITERAL
@@ -2299,7 +2305,9 @@ handler_rebind_keys_add(boolean keyfirst)
     char buf2[QBUFSZ];
     uchar key = '\0';
     int clr = NO_COLOR;
+    char cmdstr[BUFSZ];
 
+    cmdstr[0] = '\0';
     if (keyfirst) {
         pline("Bind which key? ");
         key = pgetchar();
@@ -2353,7 +2361,6 @@ handler_rebind_keys_add(boolean keyfirst)
     destroy_nhwindow(win);
     if (npick > 0) {
         struct Cmd_bind *prevcmd;
-        char cmdstr[BUFSZ];
 
         i = picks->item.a_int;
         free((genericptr_t) picks);

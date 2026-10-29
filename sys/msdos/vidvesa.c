@@ -29,7 +29,12 @@ struct Pixel {
 #define FIRST_TEXT_COLOR 240
 
 #ifdef TILES_IN_GLYPHMAP
-extern int total_tiles_used, Tile_corr, Tile_unexplored;  /* from tile.c */
+extern int total_tiles_used,
+           Tile_corr,
+           Tile_unexplored,
+           Tile_delimiter,
+           Tile_petmark,
+           Tile_pilemark;  /* from tile.c */
 #endif
 struct VesaCharacter {
     uint32 colour, bgcolour;
@@ -42,7 +47,9 @@ static unsigned long vesa_ReadPixel32(unsigned x, unsigned y);
 static void vesa_WritePixel32(unsigned x, unsigned y, unsigned long color);
 static void vesa_WritePixel(unsigned x, unsigned y, unsigned color);
 static void vesa_WritePixelRow(unsigned long offset,
-                               unsigned char const *p_row, unsigned p_row_size);
+                               unsigned char const *p_row,
+                               unsigned char const *p_decal_row,
+                               unsigned p_row_size);
 static unsigned long vesa_MakeColor(struct Pixel);
 static void vesa_FillRect(unsigned left, unsigned top, unsigned width,
                           unsigned height, unsigned color);
@@ -60,7 +67,8 @@ static boolean vesa_SetPalette(const struct Pixel *);
 static boolean vesa_SetHardPalette(const struct Pixel *);
 static boolean vesa_SetSoftPalette(const struct Pixel *);
 #ifdef TILES_IN_GLYPHMAP
-static void vesa_DisplayCell(int, int, int);
+static void vesa_DisplayCell(int, int, int, uint8_t);
+static uint8_t *add_transparent_row(uint8_t const *, uint8_t const *, unsigned, uint32_t);
 #endif
 static unsigned vesa_FindMode(unsigned long mode_addr, unsigned bits);
 static void vesa_WriteChar(uint32, int, int, uint32);
@@ -106,10 +114,17 @@ static struct map_struct {
     uint32 ch;
     uint32 attr;
     unsigned special;
-    short int tileidx;
+    uint16_t tileidx;
+    uint16_t decalnum;
     int framecolor;
     int inverse;
 } map[ROWNO][COLNO]; /* track the glyphs */
+
+enum { delimdecal, petdecal, piledecal, NUMDECALS };
+static unsigned char *vesa_decals[NUMDECALS] = { 0 };
+static unsigned char *vesa_oview_decals[NUMDECALS] = { 0 };
+static unsigned char *tmptilebuf;
+static uint32_t tilebackground;
 
 #define vesa_clearmap()                                         \
     {                                                           \
@@ -122,6 +137,7 @@ static struct map_struct {
                 map[y][x].attr = 0;                             \
                 map[y][x].special = 0;                          \
                 map[y][x].tileidx = Tile_unexplored;            \
+                map[y][x].decalnum = 0;                         \
                 map[y][x].inverse = 0;                          \
             }                                                   \
     }
@@ -485,8 +501,22 @@ vesa_WritePixel(unsigned x, unsigned y, unsigned color)
 
 static void
 vesa_WritePixelRow(unsigned long offset,
-                   unsigned char const *p_row, unsigned p_row_size)
+                   unsigned char const *p_row,
+                   unsigned char const *p_decal_row,
+                   unsigned p_row_size)
 {
+#ifdef TILES_IN_GLYPHMAP
+    uint8_t *p_combined_row = NULL; /* custodial */
+
+    if (p_decal_row != NULL) {
+        p_combined_row = add_transparent_row(
+                p_row, p_decal_row, p_row_size, tilebackground);
+        p_row = p_combined_row;
+    }
+#else
+    nhUse(p_decal_row);
+#endif
+
     if (vesa_segment != 0) {
         /* Linear frame buffer in use */
         movedata(_go32_my_ds(), (unsigned)p_row, vesa_segment, offset, p_row_size);
@@ -505,6 +535,10 @@ vesa_WritePixelRow(unsigned long offset,
         }
         dosmemput(p_row + i, p_row_size - i, addr);
     }
+
+#ifdef TILES_IN_GLYPHMAP
+    free(p_combined_row);
+#endif
 }
 
 static unsigned long
@@ -555,7 +589,7 @@ vesa_FillRect(unsigned left, unsigned top, unsigned width,
     }
 
     for (y = 0; y < height; ++y) {
-        vesa_WritePixelRow(offset, p_row, p_row_size);
+        vesa_WritePixelRow(offset, p_row, NULL, p_row_size);
         offset += vesa_scan_line;
     }
 
@@ -711,6 +745,42 @@ vesa_xputg(const glyph_info *glyphinfo, const glyph_info *bkglyphinfo UNUSED)
     uint32_t attr = (g_attribute == 0) ? attrib_gr_normal : g_attribute;
     int ry;
 
+    /* some decal initializations */
+    if (!vesa_decals[delimdecal]) {
+        vesa_decals[delimdecal] = vesa_tile(Tile_delimiter);
+        /* The first pixel in Tile_delimiter is the background color */
+        switch(vesa_pixel_bytes) {
+        case 1:
+            tilebackground = *((uint8_t *)vesa_decals[delimdecal]);
+            break;
+
+        case 2:
+            tilebackground = *((uint16_t *)vesa_decals[delimdecal]);
+            break;
+
+        case 3:
+        case 4:
+            tilebackground = *((uint32_t *)vesa_decals[delimdecal]) & 0x00FFFFFF;
+            break;
+        }
+        if (!vesa_decals[petdecal])
+            vesa_decals[petdecal] = vesa_tile(Tile_petmark);
+
+        if (!vesa_decals[piledecal])
+            vesa_decals[piledecal] = vesa_tile(Tile_pilemark);
+
+        if (!vesa_oview_decals[petdecal])
+            vesa_oview_decals[petdecal] = vesa_oview_tile(Tile_petmark);
+
+        if (!vesa_oview_decals[piledecal])
+            vesa_oview_decals[piledecal] = vesa_oview_tile(Tile_pilemark);
+    }
+
+    unsigned decalnum = ((special & MG_PET) && iflags.hilite_pet)
+                            ? petdecal
+                            : ((special & MG_OBJPILE) && iflags.hilite_pile)
+                                ? piledecal : 0;
+ 
 #ifdef ENHANCED_SYMBOLS
     if (SYMHANDLING(H_UTF8) && glyphinfo->gm.u && glyphinfo->gm.u->utf8str) {
         ch = glyphinfo->gm.u->utf32ch;
@@ -739,6 +809,7 @@ vesa_xputg(const glyph_info *glyphinfo, const glyph_info *bkglyphinfo UNUSED)
     map[ry][col].ch = ch;
     map[ry][col].special = special;
     map[ry][col].tileidx = glyphinfo->gm.tileidx;
+    map[ry][col].decalnum = decalnum;
     map[ry][col].attr = attr;
     map[ry][col].inverse = inversed;
 
@@ -755,7 +826,7 @@ vesa_xputg(const glyph_info *glyphinfo, const glyph_info *bkglyphinfo UNUSED)
             if (!iflags.over_view && map[ry][col].special)
                 decal_packed(packcell, special);
 #endif
-            vesa_DisplayCell(glyphinfo->gm.tileidx, col - clipx, ry - clipy);
+            vesa_DisplayCell(glyphinfo->gm.tileidx, col - clipx, ry - clipy, decalnum);
             if (bkglyphinfo->framecolor != NO_COLOR) {
                 int curtypbak = cursor_type;
                 int cclr = cursor_color;
@@ -868,15 +939,20 @@ vesa_redrawmap(void)
         }
     } else if (iflags.over_view) {
         /* Overview mode */
-        const unsigned char *tile;
 
         p_row_width = vesa_oview_width * vesa_pixel_bytes;
         y = y_top;
         for (cy = 0; cy < ROWNO; ++cy) {
             for (py = 0; py < vesa_oview_height; ++py) {
                 for (cx = 0; cx < COLNO; ++cx) {
-                    tile = vesa_oview_tile(map[cy][cx].tileidx);
-                    vesa_WritePixelRow(offset + p_row_width * cx, tile + p_row_width * py, p_row_width);
+                    const uint8_t *tile = vesa_oview_tile(map[cy][cx].tileidx);
+                    const uint8_t *decal = NULL;
+                    unsigned decalnum = map[cy][cx].decalnum;
+                    if (decalnum != 0 && decalnum < NUMDECALS) {
+                        decal = vesa_oview_decals[decalnum];
+                        decal += p_row_width * py;
+                    }
+                    vesa_WritePixelRow(offset + p_row_width * cx, tile + p_row_width * py, decal, p_row_width);
                 }
                 x = COLNO * vesa_oview_width;
                 if (x < vesa_x_res) {
@@ -888,15 +964,20 @@ vesa_redrawmap(void)
         }
     } else {
         /* Normal tiled mode */
-        const unsigned char *tile;
 
         p_row_width = iflags.wc_tile_width * vesa_pixel_bytes;
         y = y_top;
         for (cy = clipy; cy <= (unsigned) clipymax && cy < ROWNO; ++cy) {
             for (py = 0; py < (unsigned) iflags.wc_tile_height; ++py) {
                 for (cx = clipx; cx <= (unsigned) clipxmax && cx < COLNO; ++cx) {
-                    tile = vesa_tile(map[cy][cx].tileidx);
-                    vesa_WritePixelRow(offset + p_row_width * (cx - clipx), tile + p_row_width * py, p_row_width);
+                    const uint8_t *tile = vesa_tile(map[cy][cx].tileidx);
+                    const uint8_t *decal = NULL;
+                    unsigned decalnum = map[cy][cx].decalnum;
+                    if (decalnum != 0 && decalnum < NUMDECALS) {
+                        decal = vesa_decals[decalnum];
+                        decal += p_row_width * py;
+                    }
+                    vesa_WritePixelRow(offset + p_row_width * (cx - clipx), tile + p_row_width * py, decal, p_row_width);
                 }
                 x = (cx - clipx) * iflags.wc_tile_width;
                 if (x < vesa_x_res) {
@@ -1390,6 +1471,8 @@ vesa_Finish(void)
     free(vesa_tiles);
     free(vesa_oview_tiles);
     free_tiles();
+    if (tmptilebuf)
+        free((genericptr_t) tmptilebuf), tmptilebuf = 0;
 #endif
     vesa_SwitchMode(MODETEXT);
     windowprocs.win_cliparound = tty_cliparound;
@@ -1825,7 +1908,7 @@ vesa_WriteTextRow(int pixx, int pixy, struct VesaCharacter const *t_row,
                 }
             }
         }
-        vesa_WritePixelRow(offset, p_row, p_row_width);
+        vesa_WritePixelRow(offset, p_row, NULL, p_row_width);
         offset += vesa_scan_line;
     }
     free(p_row);
@@ -1941,14 +2024,16 @@ vesa_TriplePixels(unsigned long fnt)
  */
 #ifdef TILES_IN_GLYPHMAP
 static void
-vesa_DisplayCell(int tilenum, int col, int row)
+vesa_DisplayCell(int tilenum, int col, int row, uint8_t decalnum)
 {
     unsigned char const *tile;
     unsigned t_width, t_height;
     unsigned char const *tptr;
+
     int /* px, */ py, pixx, pixy;
     unsigned long offset;
     unsigned p_row_width;
+    unsigned char const *decal;
 
     if (iflags.over_view) {
         tile = vesa_oview_tile(tilenum);
@@ -1967,13 +2052,114 @@ vesa_DisplayCell(int tilenum, int col, int row)
     pixx += vesa_x_center;
     pixy += vesa_y_center;
     offset = pixy * (unsigned long)vesa_scan_line + pixx * vesa_pixel_bytes;
+    if (decalnum != 0 && decalnum < NUMDECALS) {
+        if (iflags.over_view) {
+            decal = vesa_oview_decals[decalnum];
+        } else {
+            decal = vesa_decals[decalnum];
+        }
+    } else {
+        decal = NULL;
+    }
     tptr = tile;
 
     for (py = 0; py < (int) t_height; ++py) {
-        vesa_WritePixelRow(offset, tptr, p_row_width);
+        vesa_WritePixelRow(offset, tptr, decal, p_row_width);
         offset += vesa_scan_line;
         tptr += p_row_width;
+        if (decal != NULL) {
+            decal += p_row_width;
+        }
     }
+}
+
+/* Overlay a transparent row onto the given pixel row */
+/* Return an allocated buffer containing the overlaid row */
+/* The caller is responsible for freeing the returned row */
+static uint8_t *
+add_transparent_row(
+        uint8_t const *p_row,
+        uint8_t const *p_overlay,
+        unsigned p_row_size,
+        uint32_t transparent_pixel)
+{
+    /* 
+     * ignore the "background" pixels in decal,
+     * which is identified by the delim tile in the stock
+     * tile set which is 100% background.
+     */
+    uint8_t *p_combined_row = (uint8_t *) alloc(p_row_size);
+    switch(vesa_pixel_bytes) {
+        case 1: {
+                uint8_t *t1 = (uint8_t *) p_row,
+                        *t2 = (uint8_t *) p_overlay,
+                        *t3 = (uint8_t *) p_combined_row;
+
+                for (unsigned i = 0; i < p_row_size; i += vesa_pixel_bytes) {
+                    *t3 = (*t2 != transparent_pixel) ? *t2 : *t1;
+                    ++t1;
+                    ++t2;
+                    ++t3;
+                }
+            }
+            break;
+        case 2: {
+                uint16_t *t1 = (uint16_t *) p_row,
+                         *t2 = (uint16_t *) p_overlay,
+                         *t3 = (uint16_t *) p_combined_row;
+
+                for (unsigned i = 0; i < p_row_size; i += vesa_pixel_bytes) {
+                    *t3 = (*t2 != transparent_pixel) ? *t2 : *t1;
+                    ++t1;
+                    ++t2;
+                    ++t3;
+                }
+            }
+            break;
+        case 3: {
+                uint8_t *t1 = (uint8_t *) p_row,
+                        *t2 = (uint8_t *) p_overlay,
+                        *t3 = (uint8_t *) p_combined_row;
+                for (unsigned i = 0; i < p_row_size; i += vesa_pixel_bytes) {
+                    uint32_t pix = ((uint32_t) t2[2] << 16)
+                                 | ((uint32_t) t2[1] <<  8)
+                                 | ((uint32_t) t2[0] <<  0);
+
+                    if (pix != transparent_pixel) {
+                        t3[0] = t2[0];
+                        t3[1] = t2[1];
+                        t3[2] = t2[2];
+                    } else {
+                        t3[0] = t1[0];
+                        t3[1] = t1[1];
+                        t3[2] = t1[2];
+                    }
+                    t1 += 3;
+                    t2 += 3;
+                    t3 += 3;
+                }
+            }
+            break;
+        case 4: {
+                uint32_t *t1 = (uint32_t *) p_row,
+                         *t2 = (uint32_t *) p_overlay,
+                         *t3 = (uint32_t *) p_combined_row;
+
+                for (unsigned i = 0; i < p_row_size; i += vesa_pixel_bytes) {
+                    *t3 = ((*t2 & 0x00FFFFFF) != transparent_pixel) ? *t2 : *t1;
+                    ++t1;
+                    ++t2;
+                    ++t3;
+                }
+            }
+            break;
+        default:
+            /* This isn't supposed to happen */
+            memcpy(p_combined_row, p_row, p_row_size);
+            break;
+    }
+
+    return p_combined_row;
 }
 #endif /* TILES_IN_GLYPHMAP */
 

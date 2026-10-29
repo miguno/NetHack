@@ -164,6 +164,7 @@ parkguard(struct monst *grd)
         newsym(grd->mx, grd->my);
     }
     if (m_at(0, 0) != grd) {
+        grd->mstate &= ~TERRAIN_FALLOUT_MASK;
         grd->mstate |= MON_PARKED;
         place_monster(grd, 0, 0);
     }
@@ -999,7 +1000,7 @@ gd_move(struct monst *grd)
                 gd_letknow(grd);
                 return -1;
             } else {
-                if (!Deaf) {
+                if (!Deaf && mdistu(grd) <= 10*10) {
                     SetVoice(grd, 0, 80, 0);
                     verbalize("Well, begone.");
                 }

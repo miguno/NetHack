@@ -1370,7 +1370,18 @@ currentlevel_rewrite(void)
     return nhfp;
 }
 
+void
+do_idlecheckpoint(void)
+{
+    program_state.in_idlecheckpoint = 1;
 #ifdef INSURANCE
+    save_currentstate();
+#endif /* INSURANCE */
+    program_state.in_idlecheckpoint = 0;
+}
+
+#ifdef INSURANCE
+
 void
 save_currentstate(void)
 {
@@ -1385,8 +1396,10 @@ save_currentstate(void)
     if (flags.ins_chkpt) {
         /* write out just-attained level, with pets and everything */
         nhfp = currentlevel_rewrite();
-        if (!nhfp)
+        if (!nhfp) {
+            program_state.in_checkpoint--;
             return;
+        }
         if (nhfp->structlevel)
             bufon(nhfp->fd);
         nhfp->mode = WRITING;
@@ -2183,6 +2196,7 @@ revive_corpse(struct obj *corpse)
                     pline("%s disappears%s!", The(cname), effect);
                 }
             }
+            (void) maybe_set_terrain_effects(mtmp, 0);
             break;
 
         case OBJ_MINVENT: /* probably a nymph's */

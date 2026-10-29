@@ -318,8 +318,10 @@ extern int midnight(void);
 
 /* ### cfgfiles.c ### */
 
+#ifndef __cplusplus
 #if !defined(CROSSCOMPILE) || defined(CROSSCOMPILE_TARGET)
 extern int l_get_config_errors(lua_State *) NONNULLARG1;
+#endif
 #endif
 extern int do_write_config_file(void);
 extern boolean parse_config_line(char *) NONNULLARG1;
@@ -345,7 +347,7 @@ extern void disregard_all_config_statements(void);
 extern void heed_this_config_statement(int);
 extern void disregard_this_config_statement(int);
 extern boolean config_unmatched_ignored(void);
-extern void clear_ignore_errors_on_unmatched(void);
+extern void clear_ignore_errors_on_unmatch(void);
 extern void set_ignore_errors_on_unmatched(void);
 extern void rcfile_only_this_statement(int);
 #ifdef WIN32
@@ -686,6 +688,7 @@ extern int dowipe(void);
 extern void legs_in_no_shape(const char *, boolean) NONNULLARG1;
 extern void set_wounded_legs(long, int);
 extern void heal_legs(int);
+extern void do_idlecheckpoint(void);
 
 /* ### do_name.c ### */
 
@@ -707,9 +710,11 @@ extern char *x_monnam(struct monst *, int, const char *, int, boolean) NONNULLAR
 extern char *l_monnam(struct monst *) NONNULLARG1;
 extern char *mon_nam(struct monst *) NONNULLARG1;
 extern char *noit_mon_nam(struct monst *) NONNULLARG1;
+extern char *noit_or_your_mon_nam(struct monst *) NONNULLARG1;
 extern char *some_mon_nam(struct monst *) NONNULLARG1;
 extern char *Monnam(struct monst *) NONNULLARG1;
 extern char *noit_Monnam(struct monst *) NONNULLARG1;
+extern char *noit_or_your_Monnam(struct monst *) NONNULLARG1;
 extern char *Some_Monnam(struct monst *) NONNULLARG1;
 extern char *noname_monnam(struct monst *, int) NONNULLARG1;
 extern char *m_monnam(struct monst *) NONNULLARG1;
@@ -1867,6 +1872,9 @@ extern void see_monster_closeup(struct monst *, boolean) NONNULLARG1;
 extern void see_nearby_monsters(void);
 extern void shieldeff_mon(struct monst *) NONNULLARG1;
 extern void flash_mon(struct monst *) NONNULLARG1;
+extern boolean maybe_set_terrain_effects(struct monst *,
+                                         struct permonst *) NONNULLARG1;
+extern void terrain_effects(void);
 
 /* ### mondata.c ### */
 
@@ -2087,6 +2095,8 @@ extern void awaken_soldiers(struct monst *) NONNULLARG1;
 extern int do_play_instrument(struct obj *) NONNULLARG1;
 enum instruments obj_to_instr(struct obj *) NONNULLARG1;
 
+#ifndef __cplusplus
+
 /* ### nhlsel.c ### */
 
 #if !defined(CROSSCOMPILE) || defined(CROSSCOMPILE_TARGET)
@@ -2155,11 +2165,12 @@ extern int get_table_boolean_opt(lua_State *, const char *, int) NONNULLARG12;
 extern int get_table_option(lua_State *, const char *, const char *,
                             const char *const *) NO_NNARGS;
 /* extern int str_lines_max_width(const char *); */
-extern const char *get_lua_version(void);
 extern void nhl_pushhooked_open_table(lua_State *L) NONNULLARG1;
 extern void free_tutorial(void);
 extern void tutorial(boolean);
 #endif /* !CROSSCOMPILE || CROSSCOMPILE_TARGET */
+#endif /* not __cplusplus */
+extern const char *get_lua_version(void);
 
 #endif /* MAKEDEFS_C MDLIB_C CPPREGEX_C */
 
@@ -2645,16 +2656,17 @@ extern void com_pager(const char *);
 extern void qt_pager(const char *);
 extern struct permonst *qt_montype(void);
 extern void deliver_splev_message(void);
+extern void free_questpager(void);
 
 /* ### random.c ### */
 
 #if defined(RANDOM) && !defined(__GO32__) /* djgpp has its own random */
-#ifndef CROSS_TO_AMIGA
+#if !defined(CROSS_TO_AMIGA) && !defined(CROSS_TO_ATARI)
 extern void srandom(unsigned);
 extern char *initstate(unsigned, char *, int);
 extern char *setstate(char *);
 extern long random(void);
-#endif /* CROSS_TO_AMIGA */
+#endif /* !CROSS_TO_AMIGA && !CROSS_TO_ATARI */
 #endif /* RANDOM */
 
 /* ### read.c ### */
@@ -2756,9 +2768,10 @@ void restore_gamelog(NHFILE *);
 boolean restgamestate(NHFILE *);
 void restore_msghistory(NHFILE *);
 #endif
-extern void rest_adjust_levelflags(long);
+extern void rest_adjust_levelflags(long, boolean);
 extern void moves_to_relative_time(long *);
 extern void relative_time_to_moves(long *);
+extern void bones_time_adjust(long *);
 extern boolean revision_increment(int, int, uchar *);
 
 /* ### revision.c ### */
@@ -3061,6 +3074,7 @@ extern enum soundlib_ids soundlib_id_from_opt(char *);
 
 /* ### sp_lev.c ### */
 
+#ifndef __cplusplus
 #if !defined(CROSSCOMPILE) || defined(CROSSCOMPILE_TARGET)
 extern boolean match_maptyps(xint16, xint16);
 extern void create_des_coder(void);
@@ -3101,6 +3115,7 @@ extern void l_register_des(lua_State *) NONNULLARG1;
 extern int get_table_objclass(lua_State *) NONNULLARG1;
 extern int get_table_objtype(lua_State *) NONNULLARG1;
 #endif /* !CROSSCOMPILE || CROSSCOMPILE_TARGET */
+#endif /* not __cplusplus */
 
 /* ### spell.c ### */
 

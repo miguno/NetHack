@@ -450,10 +450,11 @@ restmonchn(NHFILE *nhfp)
             restpriest(mtmp, ghostly);
         if (mtmp->isgd) {
             /* fixup for new bit MON_PARKED added post 5.0.0 */
-            if (!mtmp->mx
-                && (mtmp->mstate & MON_PARKED) == 0L
-                && (mtmp->mstate & MON_MIGRATING) == 0L)
+            if (!mtmp->mx && (mtmp->mstate & MON_PARKED) == 0L
+                && (mtmp->mstate & MON_MIGRATING) == 0L) {
+                mtmp->mstate &= ~TERRAIN_FALLOUT_MASK;
                 mtmp->mstate |= MON_PARKED;
+            }
         }
 
         if (!ghostly) {
@@ -843,9 +844,6 @@ dorecover(NHFILE *nhfp)
     init_oclass_probs(); /* recompute go.oclass_prob_totals[] */
 
     restlevelstate();
-#ifdef INSURANCE
-    savestateinlock();
-#endif
     rtmp = restlevelfile(ledger_no(&u.uz));
     if (rtmp < 2)
         return rtmp; /* dorecover called recursively */
@@ -953,6 +951,12 @@ dorecover(NHFILE *nhfp)
 
     run_timers(); /* expire all timers that have gone off while away */
     program_state.restoring = 0; /* affects bot() so clear before docrt() */
+#ifdef INSURANCE
+    /* first checkpoint of the restored session; every level file has been
+       written and the current level has been read back in, so recover has
+       something to work with even if the player never changes level */
+    save_currentstate();
+#endif
 
     if (ge.early_raw_messages && !program_state.beyond_savefile_load) {
         /*
@@ -1134,13 +1138,15 @@ getlev(NHFILE *nhfp, int pid, xint8 lev)
         }
     }
     Sfi_long(nhfp, &svo.omoves, "lev-timestmp");
+    if (ghostly)
+        ga.articulo_mortis = svo.omoves;
     elapsed = (svm.moves - svo.omoves);
 
     rest_stairs(nhfp);
     Sfi_dest_area(nhfp, &svu.updest, "lev-updest");
     Sfi_dest_area(nhfp, &svd.dndest, "lev-dndest");
     Sfi_levelflags(nhfp, &svl.level.flags, "lev-level_flags");
-    rest_adjust_levelflags(elapsed);
+    rest_adjust_levelflags(elapsed, ghostly);
     if (svd.doors) {
         free(svd.doors);
         svd.doors = 0;
@@ -1207,6 +1213,8 @@ getlev(NHFILE *nhfp, int pid, xint8 lev)
         for (y = 0; y < ROWNO; y++)
             svl.level.monsters[x][y] = (struct monst *) 0;
     for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
+        if ((mtmp->mstate & TERRAIN_FALLOUT_MASK) != 0)
+            gp.pending_terrain_effects |= (mtmp->mstate & TERRAIN_FALLOUT_MASK);
         if (mtmp->isshk)
             set_residency(mtmp, FALSE);
         /* set some monst fields to sane values when coming from a bones file */
@@ -1240,6 +1248,9 @@ getlev(NHFILE *nhfp, int pid, xint8 lev)
                                   : peace_minded(mtmp->data);
             set_malign(mtmp);
         } else if (elapsed > 0L) {
+            /* restmon() based hunger on now; account for time away */
+            if (has_edog(mtmp))
+                EDOG(mtmp)->hungrytime -= elapsed;
             mon_catchup_elapsed_time(mtmp, elapsed);
         }
         /* update shape-changers in case protection against
@@ -1338,6 +1349,8 @@ getlev(NHFILE *nhfp, int pid, xint8 lev)
     if (ghostly)
         clear_id_mapping();
 #endif
+    if (ghostly)
+        ga.articulo_mortis = 0L;
     level_status.loading = 0, level_status.ready = 1;
     program_state.in_getlev = FALSE;
 #ifdef SFCTOOL
@@ -1347,11 +1360,15 @@ getlev(NHFILE *nhfp, int pid, xint8 lev)
 }
 
 void
-rest_adjust_levelflags(long elapsed)
+rest_adjust_levelflags(long elapsed, boolean ghostly)
 {
     /* adjust timestamps */
-    relative_time_to_moves(&svl.level.flags.stasis_until);
-    svl.level.flags.stasis_until -= elapsed;
+    if (!ghostly) {
+        relative_time_to_moves(&svl.level.flags.stasis_until);
+        svl.level.flags.stasis_until -= elapsed;
+    } else {
+        bones_time_adjust(&svl.level.flags.stasis_until);
+    }
 }
 
 void
@@ -1369,6 +1386,17 @@ relative_time_to_moves(long *timestamp)
 
     *timestamp = svm.moves + prevts;
 }
+
+void
+bones_time_adjust(long *timestamp)
+{
+    long prevts = *timestamp;
+
+    /* svl.level.flags.stasis_until was already converted to relative offset
+     * from ga.articulo_mortis on bones save */
+    *timestamp = svm.moves + prevts;
+}
+
 
 /* "name-role-race-gend-algn" occurs very early in a save file; sometimes we
    want the whole thing, other times just "name" (for svp.plname[]) */

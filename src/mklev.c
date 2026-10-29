@@ -1263,6 +1263,7 @@ makelevel(void)
     }
     level_status_init();
     level_status.making = 1;
+    gw.whitelist_shk |= 0x02;
 
     oinit(); /* assign level dependent obj probabilities */
     clear_level_structures();
@@ -1428,6 +1429,7 @@ makelevel(void)
         nhl_pcall_handle(gl.luacore, 1, 0, "makelevel", NHLpa_panic);
         lua_settop(gl.luacore, 0);
     }
+    gw.whitelist_shk &= ~0x02;
     level_status.making = 0, level_status.ready = 1;
 }
 
@@ -1934,7 +1936,7 @@ mktrap_victim(struct trap *ttmp)
     if (victim_mnum == PM_HUMAN && rn2(25))
         victim_mnum = rn1(PM_WIZARD - PM_ARCHEOLOGIST, PM_ARCHEOLOGIST);
     otmp = mkcorpstat(CORPSE, NULL, &mons[victim_mnum], x, y, CORPSTAT_INIT);
-    otmp->age -= (TAINT_AGE + 1); /* died too long ago to safely eat */
+    otmp->age -= (INEDIBLE_AGE + 1); /* died too long ago to safely eat */
 }
 
 /* pick a random trap type, return NO_TRAP if "too hard" */

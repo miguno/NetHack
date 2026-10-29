@@ -1538,6 +1538,8 @@ tiphat(void)
     return res;
 }
 
+char *sounddir = 0;
+
 #ifdef USER_SOUNDS
 
 typedef struct audio_mapping_rec {
@@ -1551,7 +1553,6 @@ typedef struct audio_mapping_rec {
 static audio_mapping *soundmap = 0;
 static audio_mapping *sound_matches_message(const char *);
 
-char *sounddir = 0; /* set in files.c */
 
 /* adds a sound file mapping, returns 0 on failure, 1 on success */
 int
@@ -1724,6 +1725,9 @@ extern struct sound_procs macsound_procs;
 #ifdef SND_LIB_QTSOUND
 extern struct sound_procs qtsound_procs;
 #endif
+#ifdef SND_LIB_MAC68KSOUND
+extern struct sound_procs mac68ksound_procs;
+#endif
 
 static struct sound_procs nosound_procs = {
     SOUNDID(nosound),
@@ -1774,6 +1778,9 @@ static struct sound_choices {
 #endif
 #ifdef SND_LIB_QTSOUND
     { &qtsound_procs },
+#endif
+#ifdef SND_LIB_MAC68KSOUND
+    { &mac68ksound_procs },
 #endif
 };
 
